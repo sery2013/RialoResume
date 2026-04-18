@@ -1,98 +1,153 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Header from '@/components/Header'
+import GitHubConnect from '@/components/GitHubConnect'
 import ResumeCard from '@/components/ResumeCard'
-import ConnectWallet from '@/components/ConnectWallet'
-import { fetchProfile, simulateReactiveUpdate } from '@/lib/rialo-mock'
-import { ArrowRight, Sparkles } from 'lucide-react'
+import ActivityChart from '@/components/ActivityChart'
+import ReactiveVisualizer from '@/components/ReactiveVisualizer'
+import { fetchGitHubData, simulateReactiveSync } from '@/lib/github-api'
+import { Zap, Github, RefreshCw } from 'lucide-react'
 
 export default function Home() {
-  const [wallet, setWallet] = useState<string | null>(null)
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(false)
+  const [showReactiveViz, setShowReactiveViz] = useState(false)
+  const [lastTx, setLastTx] = useState<any>(null)
 
-  useEffect(() => {
-    if (wallet) loadProfile()
-  }, [wallet])
-
-  const loadProfile = async () => {
-    if (!wallet) return
+  const handleConnect = async (username: string) => {
     setLoading(true)
     try {
-      const data = await fetchProfile(wallet)
+      const data = await fetchGitHubData(username)
       setProfile(data)
+    } catch (error) {
+      alert('GitHub user not found. Try another username.')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleSync = async () => {
-    if (!wallet) return
-    setLoading(true)
-    await simulateReactiveUpdate(wallet)
-    await loadProfile()
+  const handleReactiveSync = async () => {
+    setShowReactiveViz(true)
+    try {
+      const tx = await simulateReactiveSync(profile.github)
+      setLastTx(tx)
+      // Обновляем данные после "синхронизации"
+      const newData = await fetchGitHubData(profile.github)
+      newData.lastSync = new Date().toLocaleTimeString('en-US', { hour12: false })
+      // Немного рандомизируем для демонстрации
+      newData.commits = profile.commits + Math.floor(Math.random() * 5) + 1
+      setProfile(newData)
+    } finally {
+      setShowReactiveViz(false)
+    }
   }
 
   return (
     <main className="min-h-screen p-6 md:p-10">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         <Header />
         
-        {/* Hero Section (only when no wallet) */}
-        {!wallet && !loading && (
-          <div className="text-center py-16 mb-8 animate-float">
-            <div className="inline-flex items-center gap-2 px-4 py-2 mb-6 rounded-sm bg-[var(--accent-glow)] border border-[var(--border-accent)]">
-              <Sparkles size={14} className="text-[var(--accent-primary)]" />
-              <span className="text-sm text-[var(--accent-primary)]">Powered by Rialo Native HTTP</span>
-            </div>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Your resume, <span className="text-gradient">auto-updating</span>
-            </h2>
-            <p className="text-[var(--text-secondary)] max-w-md mx-auto mb-8">
-              Connect your wallet to activate reactive sync with GitHub, Twitter & LinkedIn via Rialo's native web calls.
-            </p>
-            <div className="flex justify-center">
-              <ConnectWallet onConnect={setWallet} />
-            </div>
-          </div>
-        )}
-        
-        {/* Wallet Display */}
-        {wallet && (
-          <div className="flex justify-end mb-6">
-            <div className="flex items-center gap-3 px-4 py-2 rounded-sm bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
-              <div className="w-2 h-2 rounded-full bg-[var(--accent-primary)] animate-pulse-glow" />
-              <span className="text-sm font-mono text-[var(--neutral)]">{wallet.slice(0, 10)}...{wallet.slice(-8)}</span>
-            </div>
-          </div>
-        )}
-
-        {/* Loading State */}
-        {loading && !profile && (
-          <div className="card flex flex-col items-center justify-center py-16">
-            <div className="w-8 h-8 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin mb-4" />
-            <p className="text-[var(--text-secondary)]">Fetching on-chain profile...</p>
-            <p className="text-xs text-[var(--text-muted)] mt-2 font-mono">via Rialo RPC • sub-second finality</p>
-          </div>
-        )}
-
-        {/* Profile Card */}
-        {profile && !loading && (
+        {!profile ? (
+          <GitHubConnect onConnect={handleConnect} loading={loading} />
+        ) : (
           <div className="space-y-6">
-            <ResumeCard data={profile} onSync={handleSync} />
-            
-            {/* Info Footer */}
+            {/* Profile Card с кнопкой Reactive Sync */}
+            <div className="card">
+              <div className="flex justify-between items-start mb-6">
+                <div className="flex items-center gap-4">
+                  {profile.avatar && (
+                    <img 
+                      src={profile.avatar} 
+                      alt={profile.github}
+                      className="w-16 h-16 rounded-sm border border-[var(--border-subtle)]"
+                    />
+                  )}
+                  <div>
+                    <h2 className="text-xl font-semibold">{profile.name}</h2>
+                    <div className="flex items-center gap-2 text-sm text-[var(--text-muted)] mt-1">
+                      <Github size={14} />
+                      <span>@{profile.github}</span>
+                      {profile.twitter !== 'not_linked' && (
+                        <>
+                          <span>•</span>
+                          <span>@{profile.twitter}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
+                <button 
+                  onClick={handleReactiveSync}
+                  disabled={loading}
+                  className="btn btn-primary group"
+                >
+                  <Zap size={16} className="group-hover:scale-110 transition-transform" />
+                  Trigger Reactive Sync
+                </button>
+              </div>
+
+              {/* Metrics */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-6 border-t border-[var(--border-subtle)]">
+                <div className="metric">
+                  <span className="metric-label">Repositories</span>
+                  <span className="metric-value">{profile.repos}</span>
+                </div>
+                <div className="metric">
+                  <span className="metric-label">Commits (30d)</span>
+                  <span className="metric-value">{profile.commits}</span>
+                </div>
+                <div className="metric">
+                  <span className="metric-label">Followers</span>
+                  <span className="metric-value">{profile.followers}</span>
+                </div>
+                <div className="metric">
+                  <span className="metric-label">Last Sync</span>
+                  <span className="metric-value font-mono text-sm">{profile.lastSync}</span>
+                </div>
+              </div>
+
+              {/* Blockchain Proof */}
+              {lastTx && (
+                <div className="mt-6 pt-6 border-t border-[var(--border-subtle)]">
+                  <p className="text-xs text-[var(--text-muted)] mb-2">Last Transaction</p>
+                  <div className="grid grid-cols-3 gap-4 text-xs font-mono">
+                    <div>
+                      <span className="text-[var(--text-muted)] block">Hash</span>
+                      <span className="text-[var(--accent-primary)]">{lastTx.hash.slice(0, 16)}...</span>
+                    </div>
+                    <div>
+                      <span className="text-[var(--text-muted)] block">Block</span>
+                      <span>{lastTx.block.toLocaleString()}</span>
+                    </div>
+                    <div>
+                      <span className="text-[var(--text-muted)] block">Gas</span>
+                      <span>{lastTx.gas.toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Activity Chart */}
+            <ActivityChart data={profile.commitHistory} />
+
+            {/* Info */}
             <div className="text-center text-sm text-[var(--text-muted)] pt-4">
               <p>
                 Built for <span className="text-[var(--accent-primary)]">Rialo Shark Tank</span> • 
-                <a href="https://rialo.io" target="_blank" rel="noopener noreferrer" className="ml-1 hover:text-[var(--accent-primary)] transition-colors inline-flex items-center gap-1">
-                  Learn more <ArrowRight size={12} />
-                </a>
+                Demonstrates native HTTP calls + reactive transactions
               </p>
             </div>
           </div>
         )}
       </div>
+
+      {/* Reactive Transaction Visualizer */}
+      <ReactiveVisualizer 
+        isActive={showReactiveViz} 
+        onComplete={() => setShowReactiveViz(false)} 
+      />
     </main>
   )
 }
