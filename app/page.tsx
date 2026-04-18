@@ -1,34 +1,29 @@
+// app/page.tsx — MINIMAL FALLBACK VERSION
 import Header from '@/components/Header'
-import GitHubResume from '@/components/GitHubResume'
-import RialoEcosystemTracker from '@/components/RialoEcosystemTracker'
+
+// Динамический импорт с обработкой ошибок, чтобы сборка не падала, если файла нет
+const GitHubResume = dynamic(() => import('@/components/GitHubResume').catch(() => () => <div className="card p-6">Loading Resume...</div>), { ssr: false })
+const RialoEcosystemTracker = dynamic(() => import('@/components/RialoEcosystemTracker').catch(() => () => <div className="card p-6">Loading Tracker...</div>), { ssr: false })
+import { Suspense } from 'react'
+import dynamic from 'next/dynamic'
 
 export default function Home() {
   return (
     <main className="min-h-screen p-6 md:p-10 bg-[#010101] text-white">
       <div className="max-w-7xl mx-auto">
-        
-        {/* 1. Общий Хедер (теперь он один на всю страницу) */}
         <Header />
-        
-        {/* 2. Связующий заголовок (поясняет концепцию 2-в-1) */}
         <div className="text-center mb-8 mt-6">
-          <h1 className="text-2xl md:text-3xl font-bold mb-2">
-            Your Identity <span className="text-[var(--accent-primary)]">×</span> Rialo Ecosystem
-          </h1>
-          <p className="text-[var(--text-muted)] max-w-xl mx-auto text-sm">
-            Real-time GitHub analytics on the left. Live Rialo repository & contributor tracking on the right.
-          </p>
+          <h1 className="text-2xl font-bold mb-2">LiveFolio <span className="text-[var(--accent-primary)]">2.0</span></h1>
+          <p className="text-sm text-gray-500">GitHub Profile + Rialo Ecosystem</p>
         </div>
-
-        {/* 3. Сетка 2 колонки */}
-        <div className="grid lg:grid-cols-2 gap-8 items-start">
-          
-          {/* ЛЕВАЯ КОЛОНКА: Твой проект (логика не изменена) */}
-          <GitHubResume />
-          
-          {/* ПРАВАЯ КОЛОНКА: Трекер репозиториев (реальные данные) */}
-          <RialoEcosystemTracker />
-          
+        
+        <div className="grid lg:grid-cols-2 gap-8">
+          <Suspense fallback={<div className="card h-96 animate-pulse" />}>
+            <GitHubResume />
+          </Suspense>
+          <Suspense fallback={<div className="card h-96 animate-pulse" />}>
+            <RialoEcosystemTracker />
+          </Suspense>
         </div>
       </div>
     </main>
