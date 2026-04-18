@@ -1,9 +1,29 @@
+import { Zap } from 'lucide-react'
+
 export default function Header() {
   return (
-    <header className="flex items-center gap-3 mb-8 border-b border-gray-800 pb-4">
-      <div className="w-8 h-8 bg-purple-500 rounded-sm flex items-center justify-center font-bold text-white text-xs">LF</div>
-      <h1 className="text-xl font-semibold tracking-tight">LiveFolio</h1>
-      <span className="ml-auto text-xs bg-gray-800 text-gray-400 px-2 py-1 rounded-sm border border-gray-700">Shark Tank MVP</span>
+    <header className="flex items-center gap-4 mb-10 pb-6 border-b border-[var(--border-subtle)]">
+      {/* Logo with subtle glow */}
+      <div className="relative">
+        <div className="w-10 h-10 rounded-sm bg-gradient-to-br from-[var(--accent-gradient-start)] to-[var(--accent-gradient-end)] flex items-center justify-center font-bold text-black text-sm">
+          LF
+        </div>
+        <div className="absolute inset-0 rounded-sm bg-[var(--accent-primary)] blur-lg opacity-20 -z-10" />
+      </div>
+      
+      <div>
+        <h1 className="text-xl font-semibold tracking-tight">
+          Live<span className="text-[var(--accent-primary)]">Folio</span>
+        </h1>
+        <p className="text-xs text-[var(--text-muted)]">Reactive Resume Protocol</p>
+      </div>
+      
+      <div className="ml-auto">
+        <span className="badge">
+          <Zap size={12} />
+          Rialo Native
+        </span>
+      </div>
     </header>
   )
 }
