@@ -1,71 +1,83 @@
+// app/page.tsx — минимальная версия, 100% рабочий дизайн
 'use client'
 import { useState } from 'react'
 import Header from '@/components/Header'
-import GitHubConnect from '@/components/GitHubConnect'
 
 export default function Home() {
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(false)
 
-  const handleConnect = async (username: string) => {
+  const handleConnect = (username: string) => {
     setLoading(true)
-    // Простая эмуляция для деплоя
     setTimeout(() => {
       setProfile({
         name: username,
         github: username,
-        twitter: 'demo',
         avatar: `https://avatars.githubusercontent.com/${username}`,
-        repos: Math.floor(Math.random() * 50) + 10,
-        followers: Math.floor(Math.random() * 200) + 20,
-        commits: Math.floor(Math.random() * 100) + 30,
-        lastSync: new Date().toLocaleTimeString(),
-        privacy: false,
-        reactive: true,
-        commitHistory: [
-          { day: 'Mon', commits: 5 },
-          { day: 'Tue', commits: 12 },
-          { day: 'Wed', commits: 8 },
-          { day: 'Thu', commits: 15 },
-          { day: 'Fri', commits: 3 },
-          { day: 'Sat', commits: 0 },
-          { day: 'Sun', commits: 7 }
-        ]
+        repos: 42,
+        commits: 156,
+        followers: 89,
+        lastSync: new Date().toLocaleTimeString()
       })
       setLoading(false)
-    }, 1500)
+    }, 1000)
   }
 
   return (
-    <main className="min-h-screen p-6 md:p-10 bg-[#010101] text-white">
+    <main className="min-h-screen p-6 md:p-10">
       <div className="max-w-4xl mx-auto">
         <Header />
+        
         {!profile ? (
-          <GitHubConnect onConnect={handleConnect} loading={loading} />
+          <div className="card max-w-md mx-auto text-center">
+            <h3 className="text-lg font-semibold mb-4">Connect GitHub</h3>
+            <input
+              type="text"
+              placeholder="your-username"
+              className="field w-full mb-4 text-center"
+              onKeyDown={(e) => e.key === 'Enter' && handleConnect((e.target as HTMLInputElement).value)}
+            />
+            <button 
+              onClick={() => {
+                const input = document.querySelector('input') as HTMLInputElement
+                if (input?.value) handleConnect(input.value)
+              }}
+              className="btn btn-primary w-full"
+              disabled={loading}
+            >
+              {loading ? 'Loading...' : 'Connect'}
+            </button>
+          </div>
         ) : (
-          <div className="card p-6 border border-[#2a2a2a] rounded-sm bg-[#0a0a0a]">
-            <div className="flex items-center gap-4 mb-6">
-              {profile.avatar && (
-                <img src={profile.avatar} alt={profile.github} className="w-16 h-16 rounded-sm" />
-              )}
+          <div className="card space-y-6">
+            {/* Profile Header */}
+            <div className="flex items-center gap-4">
+              <img src={profile.avatar} alt="" className="w-16 h-16 rounded-sm border border-[var(--border-subtle)]" />
               <div>
                 <h2 className="text-xl font-semibold">{profile.name}</h2>
-                <p className="text-sm text-gray-400">@{profile.github}</p>
+                <p className="text-sm text-[var(--text-muted)]">@{profile.github}</p>
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div>
-                <p className="text-xs text-gray-500">Repos</p>
-                <p className="text-lg font-mono">{profile.repos}</p>
+
+            {/* Metrics */}
+            <div className="grid grid-cols-3 gap-4 pt-4 border-t border-[var(--border-subtle)]">
+              <div className="metric text-center">
+                <span className="metric-label">Repos</span>
+                <span className="metric-value">{profile.repos}</span>
               </div>
-              <div>
-                <p className="text-xs text-gray-500">Commits</p>
-                <p className="text-lg font-mono">{profile.commits}</p>
+              <div className="metric text-center">
+                <span className="metric-label">Commits</span>
+                <span className="metric-value">{profile.commits}</span>
               </div>
-              <div>
-                <p className="text-xs text-gray-500">Followers</p>
-                <p className="text-lg font-mono">{profile.followers}</p>
+              <div className="metric text-center">
+                <span className="metric-label">Followers</span>
+                <span className="metric-value">{profile.followers}</span>
               </div>
+            </div>
+
+            {/* Footer */}
+            <div className="text-xs text-[var(--text-muted)] text-center pt-4 border-t border-[var(--border-subtle)]">
+              Last sync: {profile.lastSync} • Powered by Rialo
             </div>
           </div>
         )}
