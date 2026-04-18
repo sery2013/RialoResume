@@ -1,91 +1,58 @@
-// Реальные вызовы к GitHub API
-export interface GitHubUser {
+export interface GitHubProfile {
   login: string
   name: string | null
+  avatar_url: string
   public_repos: number
   followers: number
   following: number
-  avatar_url: string
-  blog: string
-  twitter_username: string | null
+  twitter_username?: string | null
+  blog?: string
+  created_at: string
 }
 
-export interface GitHubCommit {
-  sha: string
-  commit: {
-    message: string
-    date: string
-  }
+export async function fetchGitHubProfile(username: string): Promise<GitHubProfile> {
+  const res = await fetch(`https://api.github.com/users/${username}`)
+  if (!res.ok) throw new Error('User not found')
+  return res.json()
 }
 
-export async function fetchGitHubData(username: string) {
-  try {
-    // Реальный запрос к GitHub API
-    const userRes = await fetch(`https://api.github.com/users/${username}`)
-    if (!userRes.ok) throw new Error('User not found')
-    const user: GitHubUser = await userRes.json()
-
-    // Получаем последние коммиты (если есть публичные репо)
-    let commits: GitHubCommit[] = []
-    const reposRes = await fetch(`https://api.github.com/users/${username}/repos?sort=updated&per_page=5`)
-    const repos = await reposRes.json()
-    
-    if (repos.length > 0) {
-      const repoName = repos[0].name
-      const commitsRes = await fetch(`https://api.github.com/repos/${username}/${repoName}/commits?per_page=10`)
-      commits = await commitsRes.json()
-    }
-
-    // Считаем коммиты за 30 дней (упрощённо)
-    const thirtyDaysAgo = new Date()
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-    const recentCommits = commits.filter(c => new Date(c.commit.date) > thirtyDaysAgo)
-
-    return {
-      name: user.name || user.login,
-      github: user.login,
-      twitter: user.twitter_username || 'not_linked',
-      avatar: user.avatar_url,
-      repos: user.public_repos,
-      followers: user.followers,
-      commits: recentCommits.length || Math.floor(Math.random() * 50) + 20, // fallback для демо
-      lastSync: new Date().toLocaleTimeString('en-US', { hour12: false }),
-      privacy: false,
-      reactive: true,
-      syncing: false,
-      // Дополнительные данные для графиков
-      commitHistory: generateCommitHistory(recentCommits.length),
-      recentRepos: repos.slice(0, 3).map((r: any) => ({
-        name: r.name,
-        stars: r.stargazers_count,
-        language: r.language
-      }))
-    }
-  } catch (error) {
-    console.error('GitHub API Error:', error)
-    throw error
-  }
+export async function fetchUserCommits(username: string): Promise<any[]> {
+  const res = await fetch(`https://api.github.com/search/commits?q=author:${username}&per_page=100`)
+  if (!res.ok) return []
+  const data = await res.json()
+  return data.items || []
 }
 
-// Генерация данных для графика (7 дней)
-function generateCommitHistory(baseCount: number) {
-  return Array.from({ length: 7 }, (_, i) => ({
-    day: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i],
-    commits: Math.max(0, baseCount + Math.floor(Math.random() * 10) - 5)
-  }))
+export function calculateCommitActivity(commits: any[]) {
+  const last30Days = Array.from({ length: 30 }, (_, i) => {
+    const d = new Date()
+    d.setDate(d.getDate() - i)
+    return d.toISOString().split('T')[0]
+  })
+
+  const activity = last30Days.map(date => ({
+    date,
+    count: commits.filter(c => c.commit.author.date.startsWith(date)).length
+  })).reverse()
+
+  return activity
 }
 
-// Симуляция reactive transaction с задержкой
-export async function simulateReactiveSync(username: string) {
-  // Эмуляция: смарт-контракт обнаружил событие → выполнил HTTP запрос → обновил состояние
-  await new Promise(r => setTimeout(r, 800)) // "обнаружение события"
-  await new Promise(r => setTimeout(r, 1200)) // "выполнение HTTP запроса к GitHub"
-  await new Promise(r => setTimeout(r, 600)) // "запись в блокчейн"
+export function generateAchievements(profile: GitHubProfile, commits: any[]) {
+  const achievements = []
   
-  return {
-    txHash: '0x' + Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join(''),
-    blockNumber: Math.floor(Math.random() * 1000000) + 8000000,
-    gasUsed: Math.floor(Math.random() * 50000) + 21000,
-    timestamp: new Date().toISOString()
+  if (profile.public_repos >= 10) {
+    achievements.push({ id: 'builder', name: 'Active Builder', icon: '🏗️', desc: '10+ repos' })
   }
+  if (profile.followers >= 50) {
+    achievements.push({ id: 'influencer', name: 'Community Star', icon: '⭐', desc: '50+ followers' })
+  }
+  if (commits.length >= 100) {
+    achievements.push({ id: 'coder', name: 'Code Master', icon: '💻', desc: '100+ commits' })
+  }
+  if (new Date(profile.created_at).getFullYear() <= 2018) {
+    achievements.push({ id: 'veteran', name: 'OG Developer', icon: '🎖️', desc: 'Since 2018' })
+  }
+
+  return achievements
 }
