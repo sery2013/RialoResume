@@ -1,7 +1,7 @@
 // components/RialoEcosystemTracker.tsx
 'use client'
-import { useState, useEffect } from 'react'
-import { Github, GitBranch, Star, Users, ArrowUpRight, BookOpen, MessageCircle } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Github, GitBranch, Star, Users, ArrowUpRight, BookOpen, MessageCircle, Search, X } from 'lucide-react'
 import AnimatedCounter from './AnimatedCounter'
 
 // ================= TYPES =================
@@ -24,39 +24,24 @@ interface Contributor {
   contributions: number
 }
 
+interface SearchResult extends Repo {
+  full_name: string
+}
+
 // ================= CONFIG =================
 const CONFIG = {
-  // Вариант 1: Основные организации
-  organizations: [
-    'subzero-labs', 
-    'rialo-labs', 
-    'rialo',
-    'rialo-io'
-  ],
-  
-  // Вариант 2: Расширенный поиск по ключевым словам (все запрошенные)
+  organizations: ['subzero-labs', 'rialo-labs', 'rialo', 'rialo-io'],
   searchQueries: [
     'Rialo in:name,description',
     'rialo.io in:name,description',
     'Rialo blockchain in:name,description',
-    'Rialo crypto in:name,description',
-    'Rialo проект in:name,description',
     'RWA blockchain in:name,description',
-    'Pantera Capital Rialo in:name,description',
     'real-world assets blockchain in:name,description',
-    'Web2 to Web3 onboarding in:name,description',
     'Subzero Labs in:name,description',
-    // Комбинированный поиск (самый широкий)
-    'Rialo rialo.io blockchain RWA real-world-assets language:Rust language:TypeScript'
   ],
-  
-  // Вариант 3: Конкретные репозитории (если знаешь точные названия)
   specificRepos: [
     'subzero-labs/rialo',
     'rialo-labs/rialo',
-    'rialo-labs/rialo-core',
-    'rialo-labs/rialo-sdk',
-    'subzero-labs/rialo-protocol',
   ]
 }
 
@@ -66,6 +51,13 @@ export default function RialoEcosystemTracker() {
   const [contributors, setContributors] = useState<Contributor[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [showResults, setShowResults] = useState(false)
+  const searchRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -73,7 +65,7 @@ export default function RialoEcosystemTracker() {
         let reposData: Repo[] = []
         let contributorsData: Contributor[] = []
 
-        // ── Метод 1: Поиск по организациям ──
+        // Метод 1: Поиск по организациям
         for (const org of CONFIG.organizations) {
           try {
             const res = await fetch(`https://api.github.com/orgs/${org}/repos?sort=updated&per_page=10`)
@@ -82,13 +74,10 @@ export default function RialoEcosystemTracker() {
               const rialoRepos = data.filter((repo: any) => 
                 repo.name.toLowerCase().includes('rialo') || 
                 repo.description?.toLowerCase().includes('rialo') ||
-                repo.description?.toLowerCase().includes('rwa') ||
-                repo.description?.toLowerCase().includes('real-world')
+                repo.description?.toLowerCase().includes('rwa')
               )
               if (rialoRepos.length > 0) {
                 reposData = rialoRepos.slice(0, 4)
-                
-                // Получаем контрибьюторов первого репо
                 if (rialoRepos[0]) {
                   const contribRes = await fetch(
                     `https://api.github.com/repos/${org}/${rialoRepos[0].name}/contributors?per_page=5`
@@ -97,15 +86,15 @@ export default function RialoEcosystemTracker() {
                     contributorsData = await contribRes.json()
                   }
                 }
-                break // нашли организацию
+                break
               }
             }
           } catch (e) {
-            console.log(`Org ${org} not found, trying next...`)
+            console.log(`Org ${org} not found`)
           }
         }
 
-        // ── Метод 2: Поиск по всем запросам из CONFIG.searchQueries ──
+        // Метод 2: Поиск по запросам
         if (reposData.length === 0) {
           for (const query of CONFIG.searchQueries) {
             try {
@@ -115,13 +104,10 @@ export default function RialoEcosystemTracker() {
               if (searchRes.ok) {
                 const searchData = await searchRes.json()
                 if (searchData.items && searchData.items.length > 0) {
-                  // Фильтруем дубликаты и релевантные репозитории
                   const uniqueRepos = searchData.items.filter((repo: any) => 
                     !reposData.find(r => r.html_url === repo.html_url)
                   )
                   reposData = [...reposData, ...uniqueRepos].slice(0, 4)
-                  
-                  // Контрибьюторы для первого найденного
                   if (reposData[0]) {
                     const contribRes = await fetch(
                       `https://api.github.com/repos/${reposData[0].owner.login}/${reposData[0].name}/contributors?per_page=5`
@@ -130,47 +116,23 @@ export default function RialoEcosystemTracker() {
                       contributorsData = await contribRes.json()
                     }
                   }
-                  break // нашли хотя бы один репозиторий
+                  break
                 }
               }
             } catch (e) {
-              console.log(`Query "${query}" failed, trying next...`)
-            }
-          }
-        }
-
-        // ── Метод 3: Конкретные репозитории ──
-        if (reposData.length === 0 && CONFIG.specificRepos.length > 0) {
-          for (const repoPath of CONFIG.specificRepos) {
-            try {
-              const res = await fetch(`https://api.github.com/repos/${repoPath}`)
-              if (res.ok) {
-                const repoData = await res.json()
-                reposData.push(repoData)
-                
-                const contribRes = await fetch(
-                  `https://api.github.com/repos/${repoPath}/contributors?per_page=5`
-                )
-                if (contribRes.ok) {
-                  contributorsData = await contribRes.json()
-                }
-                break
-              }
-            } catch (e) {
-              console.log(`Repo ${repoPath} not found`)
+              console.log(`Query failed`)
             }
           }
         }
 
         if (reposData.length === 0) {
-          throw new Error('No Rialo repositories found. Try updating CONFIG with correct organization/repo names')
+          throw new Error('No Rialo repositories found')
         }
 
         setRepos(reposData)
         setContributors(contributorsData)
         setError(null)
       } catch (err: any) {
-        console.error('Fetch error:', err)
         setError(err.message || 'Failed to load data')
       } finally {
         setLoading(false)
@@ -179,6 +141,46 @@ export default function RialoEcosystemTracker() {
 
     fetchData()
   }, [])
+
+  // Click outside to close search results
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowResults(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Search function
+  const handleSearch = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    if (!searchQuery.trim()) return
+
+    setIsSearching(true)
+    setShowResults(true)
+
+    try {
+      const res = await fetch(
+        `https://api.github.com/search/repositories?q=${encodeURIComponent(searchQuery)}&sort=stars&order=desc&per_page=10`
+      )
+      if (res.ok) {
+        const data = await res.json()
+        setSearchResults(data.items || [])
+      }
+    } catch (err) {
+      console.error('Search error:', err)
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
+  const clearSearch = () => {
+    setSearchQuery('')
+    setSearchResults([])
+    setShowResults(false)
+  }
 
   return (
     <div className="space-y-6">
@@ -191,38 +193,108 @@ export default function RialoEcosystemTracker() {
           <div>
             <h2 className="text-lg font-bold">Rialo Ecosystem</h2>
             <p className="text-xs text-[var(--text-muted)]">
-              {loading ? 'Searching repositories...' : error ? 'Search failed' : `${repos.length} repos found`}
+              {loading ? 'Loading...' : error ? 'Error' : `${repos.length} repos found`}
             </p>
           </div>
         </div>
         <div className="flex gap-2">
-          <a href="https://github.com/search?q=rialo&type=repositories" target="_blank" rel="noreferrer" className="btn btn-outline text-xs flex items-center gap-1 px-2 py-1 h-8">
-            <Github size={14} /> Search
-          </a>
           <a href="https://rialo.io" target="_blank" rel="noreferrer" className="btn btn-outline text-xs flex items-center gap-1 px-2 py-1 h-8">
             <BookOpen size={14} /> Website
           </a>
         </div>
       </div>
 
+      {/* Search Box */}
+      <div className="relative" ref={searchRef}>
+        <form onSubmit={handleSearch} className="relative">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search Rialo repos on GitHub..."
+            className="field w-full pl-10 pr-10"
+          />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={clearSearch}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-white"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </form>
+
+        {/* Search Results Dropdown */}
+        {showResults && (searchResults.length > 0 || isSearching) && (
+          <div className="absolute top-full left-0 right-0 mt-2 card bg-[var(--bg-elevated)] border border-[var(--border-subtle)] z-50 max-h-96 overflow-y-auto">
+            {isSearching ? (
+              <div className="p-4 text-center text-[var(--text-muted)]">
+                <div className="w-6 h-6 mx-auto mb-2 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin" />
+                Searching...
+              </div>
+            ) : (
+              <div className="py-2">
+                <div className="px-4 py-2 text-xs text-[var(--text-muted)] border-b border-[var(--border-subtle)]">
+                  {searchResults.length} results for "{searchQuery}"
+                </div>
+                {searchResults.slice(0, 10).map((repo) => (
+                  <a
+                    key={repo.html_url}
+                    href={repo.html_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--bg-card)] transition-colors border-b border-[var(--border-subtle)] last:border-0"
+                    onClick={() => setShowResults(false)}
+                  >
+                    <img src={repo.owner.avatar_url} alt="" className="w-6 h-6 rounded-sm" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-sm truncate">{repo.full_name}</span>
+                        {repo.language && (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-[var(--bg-elevated)] rounded-sm text-[var(--text-muted)]">
+                            {repo.language}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-[var(--text-muted)] truncate">{repo.description || 'No description'}</p>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-[var(--text-muted)]">
+                      <span className="flex items-center gap-1">
+                        <Star size={12} /> {repo.stargazers_count}
+                      </span>
+                      <ArrowUpRight size={14} />
+                    </div>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* No results message */}
+        {showResults && searchResults.length === 0 && !isSearching && searchQuery && (
+          <div className="absolute top-full left-0 right-0 mt-2 card bg-[var(--bg-elevated)] border border-[var(--border-subtle)] z-50 p-4 text-center text-[var(--text-muted)]">
+            No repositories found for "{searchQuery}"
+          </div>
+        )}
+      </div>
+
       {/* Loading State */}
       {loading ? (
         <div className="card text-center py-12 text-[var(--text-muted)] animate-pulse">
           <div className="w-8 h-8 mx-auto mb-3 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin" />
-          Searching GitHub for Rialo repositories...
+          Loading ecosystem data...
         </div>
       ) : error ? (
-        /* Error State */
         <div className="card p-6 border border-red-500/30">
           <p className="text-red-400 text-sm mb-2">⚠️ {error}</p>
-          <p className="text-xs text-[var(--text-muted)]">
-            Try updating CONFIG in RialoEcosystemTracker.tsx with correct organization/repo names
-          </p>
+          <p className="text-xs text-[var(--text-muted)]">Use search above to find Rialo repositories</p>
         </div>
       ) : (
-        /* Success State */
         <>
-          {/* Repos List */}
+          {/* Featured Repos */}
           <div className="grid gap-3">
             {repos.map((repo) => (
               <a
@@ -255,7 +327,7 @@ export default function RialoEcosystemTracker() {
             ))}
           </div>
 
-          {/* Contributors List */}
+          {/* Contributors */}
           {contributors.length > 0 && (
             <div className="card">
               <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
